@@ -1,7 +1,7 @@
-package com.kgcc.assets.config;
+package com.kgc.assets.config;
 
 
-import com.kgcc.assets.util.RedisUtil;
+import com.kgc.assets.util.RedisUtil;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;

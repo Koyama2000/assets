@@ -1,5 +1,7 @@
 package com.kgc.assets.bean;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.io.Serializable;
 import java.util.Date;
 
@@ -11,7 +13,7 @@ public class Assets implements Serializable {
     private String assetname;
 
     private String assettype;
-
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date intodate;
 
     public Integer getId() {

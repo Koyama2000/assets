@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://unpkg.com/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="vuebox">
+            <!--图书列表-->
+            <div class="row">
+                <div class="col-md-12">
+                    <label>资产编号:</label><input type="text" class="form-control" v-model="assetName"/><br/>
+                    <label>资产类型:</label>
+                    <select v-model="assetType">
+                        <option value="请选择">请选择</option>
+                        <option value="电子">电子设备</option>
+                        <option value="机械">机械设备</option>
+                        <option value="运输">运输设备</option>
+                    </select>
+                    <br/>
+                    <button @click="queryAll()">查询</button><button @click="openAdd()">新增</button>
+                </div>
+                <div class="col-md-12">
+                    <br/>
+                    <table class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>资产编号</th>
+                            <th>资产名称</th>
+                            <th>资产类型</th>
+                            <th>入库时间</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr v-for="item in asslist">
+                            <td>{{item.assetid}}</td>
+                            <td>{{item.assetname}}</td>
+                            <td>{{item.assettype}}</td>
+                            <td>{{item.intodate}}</td>
+                            <td><a href="javascript:void(0)" @click="del(item.id)">删除</a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                    <br/>
+                </div>
+            </div>
+            <!-- 添加模态框-->
+            <div class="modal fade" id="AddModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                            <h4 class="modal-title" id="myModalLabel">添加</h4>
+                        </div>
+                        <div class="modal-body">
+                            <label>资产编号:</label><input type="text" class="form-control" v-model="assets.assetid"/><br/>
+                            <label>资产名称:</label><input type="text" class="form-control" v-model="assets.assetname"/><br/>
+                            <label>资产类型:</label>
+                            <select v-model="assets.assettype">
+                                <option value="电子设备">电子设备</option>
+                                <option value="机械设备">机械设备</option>
+                                <option value="运输设备">运输设备</option>
+                            </select><br/>
+                            <label>入库时间:</label><input type="text" class="form-control" v-model="assets.intodate"/><br/>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-default" data-dismiss="modal" >关闭</button>
+                            <a href="#" class="btn btn-primary" @click="saveStu()">提交更改</a>
+                        </div>
+                    </div><!-- /.modal-content -->
+                </div><!-- /.modal-dialog -->
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
+<script type="text/javascript">
+    var vm=new Vue({
+        el:"#vuebox",
+        data:{
+            ifassid:false,
+            assetName:null,
+            assetType:"请选择",
+            asslist:[],
+            assets:{assetid:null,assetname:null,assettype:"电子设备",intodate:null}
+        }
+        ,mounted() {
+            this.queryAll();
+        },methods:{
+            queryAll:function () {
+                if(this.assetType=="请选择"){
+                    axios({url:"/ass/list", method:"get",
+                        params:{assetName:this.assetName,assetType:"设备"}})
+                        .then(res=>{
+                            this.asslist=res.data})
+                }else{
+                    axios({url:"/ass/list", method:"get",
+                        params:{assetName:this.assetName,assetType:this.assetType}})
+                        .then(res=>{
+                            console.log(res.data);
+                            if(res.data.length==0){
+                                        alert("没有查询到!");
+                                        this.assetName=null;
+                                        this.assetType="请选择";
+                                        this.queryAll();
+                            }
+                            this.asslist=res.data;
+                        })
+                }
+            },
+            del:function (id) {
+                if(confirm("确认删除吗?")){
+                    axios({url:"/ass/del", method:"post", params:{id:id}}).
+                    then(res=>{
+                        if(res.data>0){
+                            alert("删除成功!");
+                            this.queryAll();
+                        }else{
+                            alert("删除失败!");
+                        }
+                    });
+                }
+            }
+            ,
+            openAdd:function () {
+                $("#AddModal").modal("show");
+            },
+            saveStu:function () {
+                    axios.post("/saveass",this.assets).then(res=>{
+                        if(res.data==3){
+                            alert("该资产编号不可用!");
+                        }
+                        if(res.data==1){
+                            this.queryAll();
+                            alert("写入成功!");
+                            $("#AddModal").modal("hide");
+                            this.assets={assetid:null,assetname:null,assettype:"电子设备",intodate:null}
+                        }
+                        if(res.data==0){
+                            alert("写入失败!");
+                        }
+                    });
+            }
+        }
+
+
+    })
+</script>

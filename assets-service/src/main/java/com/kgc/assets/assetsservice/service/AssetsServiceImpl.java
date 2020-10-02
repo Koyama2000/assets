@@ -1,29 +1,24 @@
 package com.kgc.assets.assetsservice.service;
 
-import com.alibaba.fastjson.JSON;
 import com.kgc.assets.assetsservice.mapper.AssetsMapper;
 import com.kgc.assets.bean.Assets;
 import com.kgc.assets.service.AssetsService;
 import com.kgc.assets.util.RedisUtil;
 import io.searchbox.client.JestClient;
-import io.searchbox.core.Index;
-import io.searchbox.core.Search;
-import io.searchbox.core.SearchResult;
+import io.searchbox.core.*;
 import org.apache.dubbo.config.annotation.Service;
 import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.TermQueryBuilder;
+import org.elasticsearch.index.query.MatchQueryBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.sort.SortOrder;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
-import redis.clients.jedis.Jedis;
 
 import javax.annotation.Resource;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import java.util.Map;
 
 @Service
 public class AssetsServiceImpl implements AssetsService {
@@ -35,7 +30,8 @@ public class AssetsServiceImpl implements AssetsService {
     RedisUtil redisUtil;
     @Resource
     RedissonClient redissonClient;
-
+    @Resource
+    EsService esService;
 
     @Override
     public int InSert_Assets(Assets assets) {
@@ -43,67 +39,93 @@ public class AssetsServiceImpl implements AssetsService {
         if(result>0){
             //es
             this.setEs();
-            //redis
-            String asskey="stu:"+assets.getId()+":info";
-            //随机时间，防止缓存雪崩
-            Random random=new Random();
-            int i = random.nextInt(10);
-            Jedis jedis=redisUtil.getJedis();
-            jedis.del(asskey);
-            jedis.setex(asskey,i*60*10,JSON.toJSONString(assets));
         }
         return result;
     }
 
     @Override
-    public List<Assets> SelectList(String assetsName, String assetsType) {
-        List<Assets> assetslist=new ArrayList<>();
+    public List<Assets> SelectList(String assetName, String assetType) {
+        List<Assets> Assets=new ArrayList<>();
 
         SearchSourceBuilder searchSourceBuilder=new SearchSourceBuilder();
         BoolQueryBuilder boolQueryBuilder=new BoolQueryBuilder();
 
-        if(assetsName!=null&&assetsName!=""){
-            TermQueryBuilder termQueryBuilder=new TermQueryBuilder("assetsName",assetsName);
-            boolQueryBuilder.filter(termQueryBuilder);
+        if(assetName!=null&&assetName.isEmpty()==false){
+//            MatchQueryBuilder matchQueryBuilder=new MatchQueryBuilder("assetname",assetName);
+//            boolQueryBuilder.must(matchQueryBuilder);
+        } if(assetType!=null&&assetType.isEmpty()==false){
+
         }
-        if(assetsType!=null&&assetsType!=""){
-            TermQueryBuilder termQueryBuilder=new TermQueryBuilder("assetsType",assetsType);
-            boolQueryBuilder.filter(termQueryBuilder);
-        }
+            MatchQueryBuilder matchQueryBuilder=new MatchQueryBuilder("assettype",assetType);
+            boolQueryBuilder.must(matchQueryBuilder);
+        searchSourceBuilder.query(boolQueryBuilder);
+        searchSourceBuilder.sort("id",SortOrder.DESC);
 
         //高亮
-        HighlightBuilder highlightBuilder=new HighlightBuilder();
-        highlightBuilder.field("assetsName");
-        highlightBuilder.preTags("<span style='color:red;'>");
-        highlightBuilder.postTags("</span>");
-        searchSourceBuilder.highlighter(highlightBuilder);
+//        HighlightBuilder highlightBuilder=new HighlightBuilder();
+//        highlightBuilder.field("assetname");
+//        highlightBuilder.preTags("<span style='color:red;'>");
+//        highlightBuilder.postTags("</span>");
+//        searchSourceBuilder.highlighter(highlightBuilder);
+
+
         String dsl=searchSourceBuilder.toString();
-        Search search=new Search.Builder(dsl).addIndex("ass").addType("assetsinfo").build();
+        Search search=new Search.Builder(dsl).addIndex("assets").addType("assetsinfo").build();
         try {
             SearchResult searchResult=jestClient.execute(search);
             List<SearchResult.Hit<Assets,Void>> hits=searchResult.getHits(Assets.class);
             for (SearchResult.Hit<Assets,Void> hit: hits){
+
                 Assets assets=hit.source;
-                assetslist.add(assets);
+                Map<String, List<String>> highlight = hit.highlight;
+                if (highlight!=null){
+//                    String assetname = highlight.get("assetname").get(0);
+                    //使用高亮的skuName替换原来的skuName
+//                    assets.setAssetname(assetname);
+                }
+                Assets.add(assets);
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return assetslist;
+
+        return Assets;
     }
 
     @Override
     public int Del_Assets(int id) {
         int result=assetsMapper.deleteByPrimaryKey(id);
-        if(result>0){
-            //es
-            this.setEs();
-            //redis
-            String asskey="stu:"+id+":info";
-            Jedis jedis=redisUtil.getJedis();
-            jedis.del(asskey);
+        String index=String.valueOf(id);
+        try {
+            esService.deleteData(index,"assets","assetsinfo");
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return result;
+    }
+
+    @Override
+    public Assets SelectByassetId(String assetId) {
+        Assets assets=null;
+        SearchSourceBuilder searchSourceBuilder=new SearchSourceBuilder();
+        //bool
+        BoolQueryBuilder boolQueryBuilder=new BoolQueryBuilder();
+        MatchQueryBuilder matchQueryBuilder=new MatchQueryBuilder("assetid",assetId);
+        boolQueryBuilder.must(matchQueryBuilder);
+        searchSourceBuilder.query(boolQueryBuilder);
+        System.out.println(searchSourceBuilder.toString());
+        Search search=new Search.Builder(searchSourceBuilder.toString()).addIndex("assets").addType("assetsinfo").build();
+        try {
+            SearchResult searchResult=jestClient.execute(search);
+            List<SearchResult.Hit<Assets,Void>> hits=searchResult.getHits(Assets.class);
+            for (SearchResult.Hit<Assets,Void> hit: hits){
+                Assets AssetsInfo=hit.source;
+               assets=AssetsInfo;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return assets;
     }
 
 

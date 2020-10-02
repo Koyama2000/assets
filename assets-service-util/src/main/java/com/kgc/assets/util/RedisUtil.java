@@ -1,4 +1,4 @@
-package com.kgcc.assets.util;
+package com.kgc.assets.util;
 
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
